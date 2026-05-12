@@ -50,11 +50,11 @@ Pro Node werden die drei Datenquellen zusammengeführt und notwendige Berechnung
 Einfache Summen über alle Nodes inkl. Prozent-Berechnung.
 
 ### Schritt 6: Namespace Ranking
- - **Top 10 CPU Req**: sortiert nach CPU-Requests absteigend
+ - **Top 10 CPU Req**: sortiert nach CPU-Requests absteigend  
      Balken-Referenz: Verhältnis zwischen reserviert und gesamt verfügbar (Req/Alloc)
- - **Top 10 RAM Req**: sortiert nach RAM-Requests absteigend
+ - **Top 10 RAM Req**: sortiert nach RAM-Requests absteigend  
      Balken-Referenz: Verhältnis zwischen reserviert und gesamt verfügbar (Req/Alloc)
- - **Top 10 CPU Hamster**: sortiert nach CPU-Differenz relativ zum größten Diff-Wert
+ - **Top 10 CPU Hamster**: sortiert nach CPU-Differenz relativ zum größten Diff-Wert  
      Balken-Referenz: Verhältnis zwischen reserviert und tatsächlich verbraucht
- - **Top 10 RAM Hamster**: sortiert nach RAM-Differenz relativ zum größten Diff-Wert
+ - **Top 10 RAM Hamster**: sortiert nach RAM-Differenz relativ zum größten Diff-Wert  
      Balken-Referenz: Verhältnis zwischen reserviert und tatsächlich verbraucht
