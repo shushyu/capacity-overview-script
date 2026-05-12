@@ -5,7 +5,7 @@ Dieses Skript wurde in einem iterativen KI-Dialog entwickelt. Anforderungen, Aus
 
 ### Überblick
 Python-Skript, das eine HTML-Kapazitätsübersicht eines OpenShift-Clusters erzeugt.
-Läuft auf dm Bastion-Host, braucht oc (eingeloggt) und Python 3.
+Läuft auf dem Bastion-Host, braucht oc (eingeloggt) und Python 3.
 Keine weiteren Abhängigkeiten notwendig. Die Kapazitätsübersicht ist eine Momentaufnahme.
 
 ### Nutzung
