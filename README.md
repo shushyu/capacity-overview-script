@@ -10,7 +10,7 @@ Keine weiteren Abhängigkeiten notwendig. Die Kapazitätsübersicht ist eine Mom
 
 ### Nutzung
 ```bash
-python3 capacity-overview-script.py > capacity-te-$(date +%F).html              #z.B. Test-Cluster
+python3 capacity-overview-script.py > capacity-$(date +%F).html         
 ```
 
 ### Ausgabe
