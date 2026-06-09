@@ -109,17 +109,19 @@ for n in sorted(nodes, key=lambda x: x['metadata']['name']):
                     for k in n['metadata'].get('labels', {})
                     if k.startswith('node-role.kubernetes.io/')])
     role = ', '.join(roles) if roles else '-'
+    is_worker = 'master' not in role and 'control-plane' not in role
 
     cr = node_req_cpu.get(name, 0)
     mr = node_req_mem.get(name, 0)
     cu = node_usage_cpu.get(name, 0)
     mu = node_usage_mem.get(name, 0)
 
-    t_cpu_a += cpu_a; t_cpu_r += cr; t_cpu_u += cu
-    t_mem_a += mem_a_mb; t_mem_r += mr; t_mem_u += mu
+    if is_worker:                                          
+        t_cpu_a += cpu_a; t_cpu_r += cr; t_cpu_u += cu
+        t_mem_a += mem_a_mb; t_mem_r += mr; t_mem_u += mu
 
     node_rows.append({
-        'name': name, 'role': role,
+        'name': name, 'role': role, 'is_worker': is_worker,
         'cpu_alloc': cpu_a, 'cpu_req': cr, 'cpu_use': cu,
         'cpu_req_pct': cr / cpu_a * 100 if cpu_a > 0 else 0,
         'cpu_use_pct': cu / cpu_a * 100 if cpu_a > 0 else 0,
@@ -127,6 +129,8 @@ for n in sorted(nodes, key=lambda x: x['metadata']['name']):
         'mem_req_pct': mr / mem_a_mb * 100 if mem_a_mb > 0 else 0,
         'mem_use_pct': mu / mem_a_mb * 100 if mem_a_mb > 0 else 0,
     })
+
+worker_count = sum(1 for r in node_rows if r['is_worker'])
 
 # Cluster totals
 pod_count = len(running)
