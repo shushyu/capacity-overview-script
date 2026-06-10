@@ -1,24 +1,29 @@
-# Kapazitätsübersicht für OpenShift-Cluster
+# Capacity Overview for OpenShift Clusters
 
-### Hinweis zur Entstehung
-Dieses Skript wurde in einem iterativen KI-Dialog entwickelt. Anforderungen, Auswahl der Metriken, Layout-Entscheidungen und Tests kamen vom Anwender. Code-Generierung, Parser-Logik und HTML/CSS-Templating wurden von der KI umgesetzt. 
+## Background
 
-### Überblick
-Python-Skript, das eine HTML-Kapazitätsübersicht eines OpenShift-Clusters erzeugt.
-Läuft auf dem Bastion-Host, braucht oc (eingeloggt) und Python 3.
-Keine weiteren Abhängigkeiten notwendig. Die Kapazitätsübersicht ist eine Momentaufnahme.
+This script was developed through an iterative AI-assisted dialogue. Requirements, metric selection, layout decisions, and testing were provided by the user. Code generation, parser logic, and HTML/CSS templating were implemented by the AI.
 
-### Nutzung
+## Overview
+
+A Python script that generates an HTML capacity overview of an OpenShift cluster. Runs on the bastion host, requires `oc` (logged in) and Python 3. No additional dependencies needed. The capacity overview is a point-in-time snapshot.
+
+## Usage
+
 ```bash
-python3 capacity-overview-script.py > capacity-$(date +%F).html         
+python3 capacity-overview-script.py > capacity-$(date +%F).html
 ```
 
-### Ausgabe
-Eine einzelne HTML-Datei mit inline CSS.
+## Output
 
-## Ablauf
-### Schritt 1: Daten holen
-Vier oc-Aufrufe, alles was das Skript braucht:
+A single HTML file with inline CSS.
+
+## How It Works
+
+### Step 1: Fetch Data
+
+Four `oc` calls — everything the script needs:
+
 ```bash
 oc get nodes -o json
 oc get pods -A -o json
@@ -26,35 +31,38 @@ oc get pv -o json
 oc adm top nodes
 ```
 
+### Step 2: Parse
 
-### Schritt 2: Parsen
-Drei Parser-Funktionen wandeln Ressourcenwerte des Clusters in lesbare Zahlen um:
-```bash
-pc (v)                                  # CPU-Werte > Cores
-pm_gb(v)                                # Speicher > GB
-pm_mb(v)                                # Wrapper, ruft pm_gb() auf und multipliziert x 1024
-parse_top_line(line)    # parst eine Zeile von oc adm top nodes --no-headers
+Three parser functions convert cluster resource values into readable numbers:
+
+```python
+pc(v)                    # CPU values → cores
+pm_gb(v)                 # Memory → GB
+pm_mb(v)                 # Wrapper, calls pm_gb() and multiplies by 1024
+parse_top_line(line)     # Parses a single line from oc adm top nodes --no-headers
 ```
 
-### Schritt 3: Daten aggregieren
-Drei Aggregationen laufen über die Pod-Liste:
-- **Requests pro Node** - das Skript iteriert über alle laufenden Pods, liest spec.Nodename und summiert die resources.requersts.cpu/memory aller Container auf dem jeweiligen Node.
-Ergebnis: zwei Dictionaries **node_req_cpu** und **node_req_mem** verknüpft mit dem Node-Name.
-- **Usage pro Node** - Kommt direkt aus oc adm top nodes. Wird in node_usage_cpu und node_usage_mem gespeichert.
-- **Requests/Limits pro Node** - Gleiche Pod-Schleife aber gruppiert nach metadata.namespace.
+### Step 3: Aggregate Data
 
-### Schritt 4: Node-Rows zusammenbauen
-Pro Node werden die drei Datenquellen zusammengeführt und notwendige Berechnungen für die Darstellung durchgeführt.
+Three aggregations run over the pod list:
 
-### Schritt 5: Cluster-Summen berechnen
-Einfache Summen über alle Nodes inkl. Prozent-Berechnung.
+- **Requests per Node** — The script iterates over all running pods, reads `spec.nodeName`, and sums up `resources.requests.cpu` / `resources.requests.memory` for all containers on each node. Result: two dictionaries `node_req_cpu` and `node_req_mem`, keyed by node name.
+- **Usage per Node** — Sourced directly from `oc adm top nodes`. Stored in `node_usage_cpu` and `node_usage_mem`.
+- **Requests/Limits per Namespace** — Same pod loop, but grouped by `metadata.namespace`.
 
-### Schritt 6: Namespace Ranking
- - **Top 10 CPU Req**: sortiert nach CPU-Requests absteigend  
-     Balken-Referenz: Verhältnis zwischen reserviert und gesamt verfügbar (Req/Alloc)
- - **Top 10 RAM Req**: sortiert nach RAM-Requests absteigend  
-     Balken-Referenz: Verhältnis zwischen reserviert und gesamt verfügbar (Req/Alloc)
- - **Top 10 CPU Hamster**: sortiert nach CPU-Differenz relativ zum größten Diff-Wert  
-     Balken-Referenz: Verhältnis zwischen reserviert und tatsächlich verbraucht
- - **Top 10 RAM Hamster**: sortiert nach RAM-Differenz relativ zum größten Diff-Wert  
-     Balken-Referenz: Verhältnis zwischen reserviert und tatsächlich verbraucht
+### Step 4: Build Node Rows
+
+For each node, the three data sources are merged and the necessary calculations are performed for rendering.
+
+### Step 5: Calculate Cluster Totals
+
+Simple sums across all nodes, including percentage calculations.
+
+### Step 6: Namespace Rankings
+
+| Ranking | Sort Order | Bar Reference |
+|---|---|---|
+| **Top 10 CPU Requests** | CPU requests descending | Ratio of reserved to total allocatable (Req / Alloc) |
+| **Top 10 RAM Requests** | RAM requests descending | Ratio of reserved to total allocatable (Req / Alloc) |
+| **Top 10 CPU Hoarders** | CPU delta descending (relative to largest delta) | Ratio of reserved to actually consumed |
+| **Top 10 RAM Hoarders** | RAM delta descending (relative to largest delta) | Ratio of reserved to actually consumed |
