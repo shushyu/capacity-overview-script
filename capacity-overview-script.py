@@ -56,7 +56,9 @@ def parse_top_line(line):
     if len(parts) < 5: return None
     name = parts[0]
     cpu_used = pc(parts[1])
-    mem_used_mi = int(parts[3].rstrip('Mi')) if parts[3].endswith('Mi') else pm_mb(parts[3])
+    # Spalten: NAME  CPU(cores)  CPU%  MEMORY(bytes)  MEMORY%
+    # pm_mb() versteht alle Einheiten (Mi/Gi/Ki/bytes) korrekt und robust.
+    mem_used_mi = pm_mb(parts[3])
     return name, cpu_used, mem_used_mi
 
 # -------------------------------------------------------------------
@@ -97,13 +99,19 @@ for p in running:
 # -------------------------------------------------------------------
 
 node_rows = []
-t_cpu_a = t_cpu_r = t_cpu_u = 0.0
-t_mem_a = t_mem_r = t_mem_u = 0.0
+t_cpu_a = t_cpu_r = t_cpu_u = t_cpu_c = 0.0
+t_mem_a = t_mem_r = t_mem_u = t_mem_c = 0.0
 
 for n in sorted(nodes, key=lambda x: x['metadata']['name']):
     name = n['metadata']['name']
     cpu_a = pc(n['status']['allocatable']['cpu'])
     mem_a_mb = pm_mb(n['status']['allocatable']['memory'])
+    # capacity = physischer Gesamtwert des Nodes (allocatable = capacity minus
+    # system-/kube-reserved). Die tatsaechliche Nutzung (oc adm top) misst den
+    # GESAMTEN Node, muss also gegen capacity und NICHT gegen allocatable
+    # prozentuiert werden - sonst sind >100% moeglich.
+    cpu_c = pc(n['status'].get('capacity', {}).get('cpu', '0')) or cpu_a
+    mem_c_mb = pm_mb(n['status'].get('capacity', {}).get('memory', '0')) or mem_a_mb
 
     roles = sorted([k.replace('node-role.kubernetes.io/', '')
                     for k in n['metadata'].get('labels', {})
@@ -116,18 +124,18 @@ for n in sorted(nodes, key=lambda x: x['metadata']['name']):
     cu = node_usage_cpu.get(name, 0)
     mu = node_usage_mem.get(name, 0)
 
-    if is_worker:                                          
-        t_cpu_a += cpu_a; t_cpu_r += cr; t_cpu_u += cu
-        t_mem_a += mem_a_mb; t_mem_r += mr; t_mem_u += mu
+    if is_worker:
+        t_cpu_a += cpu_a; t_cpu_r += cr; t_cpu_u += cu; t_cpu_c += cpu_c
+        t_mem_a += mem_a_mb; t_mem_r += mr; t_mem_u += mu; t_mem_c += mem_c_mb
 
     node_rows.append({
         'name': name, 'role': role, 'is_worker': is_worker,
         'cpu_alloc': cpu_a, 'cpu_req': cr, 'cpu_use': cu,
         'cpu_req_pct': cr / cpu_a * 100 if cpu_a > 0 else 0,
-        'cpu_use_pct': cu / cpu_a * 100 if cpu_a > 0 else 0,
+        'cpu_use_pct': cu / cpu_c * 100 if cpu_c > 0 else 0,
         'mem_alloc_mb': mem_a_mb, 'mem_req_mb': mr, 'mem_use_mb': mu,
         'mem_req_pct': mr / mem_a_mb * 100 if mem_a_mb > 0 else 0,
-        'mem_use_pct': mu / mem_a_mb * 100 if mem_a_mb > 0 else 0,
+        'mem_use_pct': mu / mem_c_mb * 100 if mem_c_mb > 0 else 0,
     })
 
 worker_count = sum(1 for r in node_rows if r['is_worker'])
@@ -135,11 +143,14 @@ worker_count = sum(1 for r in node_rows if r['is_worker'])
 # Cluster totals
 pod_count = len(running)
 cpu_alloc = t_cpu_a; cpu_req = t_cpu_r; cpu_use = t_cpu_u
+cpu_cap = t_cpu_c
 mem_alloc_gb = t_mem_a / 1024; mem_req_gb = t_mem_r / 1024; mem_use_gb = t_mem_u / 1024
+mem_cap_gb = t_mem_c / 1024
 cpu_req_pct = cpu_req / cpu_alloc * 100 if cpu_alloc > 0 else 0
-cpu_use_pct = cpu_use / cpu_alloc * 100 if cpu_alloc > 0 else 0
+# Usage gegen capacity (physisch), Requests gegen allocatable (Scheduler-Sicht)
+cpu_use_pct = cpu_use / cpu_cap * 100 if cpu_cap > 0 else 0
 mem_req_pct = mem_req_gb / mem_alloc_gb * 100 if mem_alloc_gb > 0 else 0
-mem_use_pct = mem_use_gb / mem_alloc_gb * 100 if mem_alloc_gb > 0 else 0
+mem_use_pct = mem_use_gb / mem_cap_gb * 100 if mem_cap_gb > 0 else 0
 
 # Namespace aggregation
 ns = defaultdict(lambda: {'cr': 0, 'cl': 0, 'mr': 0, 'ml': 0, 'p': 0})
@@ -199,7 +210,8 @@ a(f'<h2 style="{H2}">NODES ({node_count})</h2>')
 a(f'<p style="{LEG}">'
   f'<b>Req</b> = Reserviert (Requests) | '
   f'<b>Use</b> = Tatsächlich genutzt | '
-  f'<b>Alloc</b> = Verfügbar (Allocatable) |  '
+  f'<b>Alloc</b> = Verfügbar (Allocatable) | '
+  f'<b>Req %</b> bezogen auf Allocatable, <b>Use %</b> bezogen auf physische Capacity |  '
   f'Balken: '
   f'<span style="color:#4caf50;">&#9632;</span> &lt;60% '
   f'<span style="color:#ff9800;">&#9632;</span> 60-80% '
@@ -263,9 +275,10 @@ a('<div style="display:flex;gap:24px;">')
 a('<div style="flex:1;min-width:400px;">')
 a(f'<h3 style="{H3}">CPU (Cores)</h3>')
 mini_table([
+    ('Capacity (physisch)',   f'{cpu_cap:.1f}', '', 0),
     ('Allocatable',           f'{cpu_alloc:.1f}', '', 0),
     ('Requests (reserviert)', f'{cpu_req:.1f}', f'{cpu_alloc:.1f}', cpu_req_pct),
-    ('Usage (tatsächlich)',   f'{cpu_use:.1f}', f'{cpu_alloc:.1f}', cpu_use_pct),
+    ('Usage (tatsächlich)',   f'{cpu_use:.1f}', f'{cpu_cap:.1f}', cpu_use_pct),
     ('Frei (Alloc &minus; Req)', f'{cpu_alloc-cpu_req:.1f}', '', 0),
 ])
 a('</div>')
@@ -273,9 +286,10 @@ a('</div>')
 a('<div style="flex:1;min-width:400px;">')
 a(f'<h3 style="{H3}">RAM (GB)</h3>')
 mini_table([
+    ('Capacity (physisch)',   f'{mem_cap_gb:.1f}', '', 0),
     ('Allocatable',           f'{mem_alloc_gb:.1f}', '', 0),
     ('Requests (reserviert)', f'{mem_req_gb:.1f}', f'{mem_alloc_gb:.1f}', mem_req_pct),
-    ('Usage (tatsächlich)',   f'{mem_use_gb:.1f}', f'{mem_alloc_gb:.1f}', mem_use_pct),
+    ('Usage (tatsächlich)',   f'{mem_use_gb:.1f}', f'{mem_cap_gb:.1f}', mem_use_pct),
     ('Frei (Alloc &minus; Req)', f'{mem_alloc_gb-mem_req_gb:.1f}', '', 0),
 ])
 a('</div>')
@@ -381,3 +395,4 @@ a('</td>')
 a('</tr></table>')
 
 print('\n'.join(o))
+
