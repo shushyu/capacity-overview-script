@@ -27,8 +27,8 @@ Four `oc` calls — everything the script needs:
 ```bash
 oc get nodes -o json
 oc get pods -A -o json
-oc get pv -o json
-oc adm top nodes
+oc adm top nodes --no-headers
+oc adm top pods -A --no-headers
 ```
 
 ### Step 2: Parse
@@ -56,7 +56,19 @@ For each node, the three data sources are merged and the necessary calculations 
 
 ### Step 5: Calculate Cluster Totals
 
-Simple sums across all nodes, including percentage calculations.
+Sums across all worker nodes, including percentage calculations.
+
+**Reference values for percentages** (important):
+
+- **Req %** is calculated against `allocatable` — the scheduler places pod
+  requests against allocatable, so this reflects how "full" the schedulable
+  capacity is.
+- **Use %** is calculated against `capacity` (the node's physical total), *not*
+  against `allocatable`. `oc adm top nodes` reports the whole node's memory
+  usage (kernel, kubelet, system daemons included), which is exactly the part
+  that `allocatable` excludes. Dividing that by `allocatable` can therefore
+  exceed 100%. Using `capacity` as the reference keeps Use % ≤ 100% and
+  physically meaningful.
 
 ### Step 6: Namespace Rankings
 
