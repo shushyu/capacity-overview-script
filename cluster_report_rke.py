@@ -1,18 +1,34 @@
-import json, subprocess, sys
+import json, os, subprocess, sys
 from collections import defaultdict
 from datetime import datetime
 
 # -------------------------------------------------------------
-# DATEN HOLEN
+# KUBECONFIG
+# kubectl erbt die Umgebung des Skripts -> nimmt automatisch $KUBECONFIG.
+# Ist nichts exportiert, wuerde kubectl still auf ~/.kube/config ausweichen.
+# Das verhindern wir: ohne export kein Lauf.
+# -------------------------------------------------------------
+
+KUBECONFIG = os.environ.get('KUBECONFIG')
+if not KUBECONFIG:
+    sys.exit('KUBECONFIG nicht gesetzt. Erst: export KUBECONFIG=/pfad/zur/config')
+if ':' in KUBECONFIG:
+    sys.exit(f'KUBECONFIG enthaelt mehrere Dateien ({KUBECONFIG}). Bitte genau eine exportieren.')
+if not os.path.isfile(KUBECONFIG):
+    sys.exit(f'KUBECONFIG zeigt auf keine Datei: {KUBECONFIG}')
+
+# -------------------------------------------------------------
+# DATEN HOLEN (stderr bleibt sichtbar, landet nicht im HTML)
 # -------------------------------------------------------------
 
 def kc_json(args):
-    return json.loads(subprocess.check_output(
-        ['kubectl'] + args + ['-o', 'json'], stderr=subprocess.DEVNULL))
+    return json.loads(subprocess.check_output(['kubectl'] + args + ['-o', 'json']))
 
 def kc_text(args):
-    return subprocess.check_output(
-        ['kubectl'] + args, stderr=subprocess.DEVNULL).decode()
+    return subprocess.check_output(['kubectl'] + args).decode()
+
+context = kc_text(['config', 'current-context']).strip()
+print(f'Kubeconfig: {KUBECONFIG} | Kontext: {context}', file=sys.stderr)
 
 nodejson = kc_json(['get', 'nodes'])
 podjson  = kc_json(['get', 'pods', '-A'])
@@ -21,7 +37,7 @@ top_raw  = kc_text(['top', 'nodes', '--no-headers'])   # braucht metrics-server 
 now = datetime.now().astimezone().strftime('%d.%m.%Y %H:%M %Z')
 # RKE2 hat kein "api.<cluster>"-Schema wie OpenShift.
 # Clustername = 1. Argument, sonst kubeconfig-Kontext.
-cluster = sys.argv[1] if len(sys.argv) > 1 else kc_text(['config', 'current-context']).strip()
+cluster = sys.argv[1] if len(sys.argv) > 1 else context
 
 # -------------------------------------------------------------
 # PARSER
