@@ -11,7 +11,8 @@ A Python script that generates an HTML capacity overview of an OpenShift cluster
 ## Usage
 
 ```bash
-python3 capacity-overview-script.py > capacity-$(date +%F).html
+python3 capacity-overview-script.py > capacity-$(date +%F).html  #oc
+python3 cluster_report_rke.py > capacity-$(date +%F).html #kubectl
 ```
 
 ## Output
