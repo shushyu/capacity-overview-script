@@ -217,6 +217,7 @@ THC_CPU = THC.replace(C_HEAD, C_CPU); THR_CPU = THR.replace(C_HEAD, C_CPU)
 THC_RAM = THC.replace(C_HEAD, C_RAM); THR_RAM = THR.replace(C_HEAD, C_RAM)
 TD   = f'border-top:1px solid {C_LINE};padding:9px 14px;text-align:left;white-space:nowrap;'
 TDR  = TD.replace('text-align:left', 'text-align:right')
+WRAP = 'white-space:normal;max-width:240px;overflow-wrap:anywhere;'   # Zelleninhalt darf umbrechen
 TD2  = TD  + f'background:{C_STRIPE};'
 TDR2 = TDR + f'background:{C_STRIPE};'
 
@@ -273,8 +274,9 @@ a('<tr>'
 for i, r in enumerate(node_rows):
     s = TD2 if i%2 else TD; sr = TDR2 if i%2 else TDR
     a(f'<tr>'
-      f'<td style="{s}font-weight:600;">{r["name"]}</td>'
-      f'<td style="{s}color:{C_MUTED};">{r["role"]}</td>'
+      # Lange Namen: Umbruch nach Bindestrich erlaubt (<wbr>), max. 240px breit
+      f'<td style="{s}font-weight:600;"><div style="{WRAP}">{r["name"].replace("-", "-<wbr>")}</div></td>'
+      f'<td style="{s}color:{C_MUTED};"><div style="{WRAP}max-width:160px;">{r["role"]}</div></td>'
       f'<td style="{sr}">{r["cpu_alloc"]:.1f}</td>'
       f'<td style="{sr}">{r["cpu_req"]:.1f}</td>'
       f'<td style="{sr}">{bar(r["cpu_req_pct"],60)}</td>'
